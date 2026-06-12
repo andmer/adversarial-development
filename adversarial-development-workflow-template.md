@@ -1,5 +1,7 @@
 # Adversarial Development Workflow (v2)
 
+*Current version: v2. Version history — what each template version added and the escapes that drove it — lives in the source repo's `CHANGELOG.md`.*
+
 ## For Claude Code: Read This First
 
 When the user invokes this file (e.g., "implement issue #313, follow @adversarial-workflow"), **you are the Orchestrator**. Do not treat this document as reference material — treat it as an executable playbook you are about to run.
@@ -165,6 +167,19 @@ NOT hygiene-only — use the strongest model. A downgraded reviewer or auditor i
 silent hole in the chain. (If your agent runner lets you pin a model per spawn,
 pin the strongest one explicitly — do not rely on a sub-agent's default.)
 ```
+
+**Dedicated agents are the recommended steady state for Steps 2 and 3** (and
+for any reviewer slot where project-specific judgment has accumulated): a
+project-named agent definition with the model pinned in its frontmatter, a
+persistent-craft prompt layered *under* the Section C invocation ("the
+invocation prompt governs the task; this file is craft applied on top; on
+conflict the invocation prompt wins"), and a per-agent memory directory. The
+pattern, a fillable agent-definition template, and a procedure for deriving
+which specialists THIS project needs from its SPEC live in
+`build-methodology.md` Part 2 § "Dedicated Agents". Stock agents are fine to
+start — record whichever
+you use here, and for any stock agent whose model cannot be pinned in
+frontmatter, record the orchestrator's per-spawn model-override obligation.
 
 Step 4.5 is recommended for any change touching security, performance-critical paths, data integrity, or regulated domains. **Step 4.6 (Security Auditor) is mandatory for any change touching authentication/authorization, multi-tenant or multi-user isolation, input parsing/validation, secrets or credential handling, cryptography, error/log output, or supply-chain/dependencies; recommended otherwise (a clean security pass on a non-security change is cheap and calibrates trust).** Step 4.6 is distinct from Step 4.5: the domain-expert reviews correctness/invariants/performance; the security auditor reviews the *adversary's* view (threat model, exploitability, fail-open vs fail-closed). Step 5.5 is **mandatory** — it's the last line of defense against phantom wiring.
 
@@ -1044,6 +1059,8 @@ Apply the full workflow where the cost of a production bug exceeds the cost of t
 ## Section G — Evolving the Workflow
 
 Every bug that escapes all agents reveals a gap in the prompts. Add the missing check as a new rule in whichever agent should have caught it, and add the bug to `PROJECT_CONTEXT`'s forbidden patterns. The rules added after each escape are what make the workflow converge. When you fold an escape in, leave a short "escape folded into vN" note so the *why* of each rule survives.
+
+**Fold back upstream.** If your escape is generalizable beyond your project — a class of AI failure any project using this kit could hit, not a quirk of your stack — contribute it back to the source kit (an issue or PR) so the next template version carries the rule. The kit converges the same way your local copy does: from the escapes its users fold in. The reference project's phantom-in-production catch became Forbidden Patterns 12/13 and the Step 3.5 grep this way.
 
 ### Meta-rule for classifying any FUTURE optimization
 

@@ -154,7 +154,34 @@ nuanced fields (forbidden patterns, concurrency model, time/ID policy,
 test-discipline invariants) with the user; flag low confidence. The filled copy
 is the project's `adversarial-development-workflow.md` from here on.
 
-**Step 0.7 — Write it all back and commit.** The Foundation scaffold is itself
+**Step 0.7 — Write the project constitution (`CLAUDE.md`) and stand up the
+agent crew.** Two artifacts everything downstream assumes exist:
+
+- **`CLAUDE.md`** (or your runner's auto-loaded equivalent — `AGENTS.md`,
+  `GEMINI.md`) — the entry point a cold session reads before anything else.
+  The Resume Protocol (end of this document) starts from it; without it the
+  cheap cold-start property is lost. Keep it short enough to load every
+  session, and cover, in order: what the project is (one paragraph); the
+  document hierarchy and "SPEC wins"; the resume protocol (numbered, exact);
+  the commands — the gate ladder with each tier's role spelled out (frequent
+  vs between-rounds vs end-of-slice, and that "green" is defined ONLY by the
+  prescribed recipes); the commit-validation rule (green from every tier) and
+  the flake-triage discipline; the big-picture architecture invariants that
+  take multiple files to see; the short list of hard, easy-to-violate
+  invariants; and a one-line workflow summary.
+- **The dedicated agent layer** — at minimum a dedicated Step 2 test writer
+  and Step 3 implementer: project-named agent definitions with the model
+  pinned and a per-agent memory directory each. Then **run the roster
+  derivation** (Part 2 § "Deriving the project's specialist roster") against
+  the freshly-frozen SPEC and propose the resulting specialist roster to the
+  user in the same confirmation round as the PROJECT_CONTEXT block — create
+  only what the user confirms. Record every assignment in the workflow
+  file's `AGENT_ASSIGNMENTS`.
+
+Also create the **`/next` command** now (template at the end of this document)
+so the steady-state loop is one trigger from day one.
+
+**Step 0.8 — Write it all back and commit.** The Foundation scaffold is itself
 the first slice — run it through a (lightweight) inner loop, then commit signed.
 
 After Phase 0, the repo's documents are the source of truth. Conversation memory
@@ -424,6 +451,177 @@ and belong on almost every list — they are the two most common AI escapes:
     behavior the code does not implement. On a load-bearing path this is a
     CORRECTNESS finding; the comment is the contract the next reader trusts.
 
+## Dedicated Agents — The Persistent Specialist Layer
+
+The workflow template's Section C prompts are the **per-task contract** — they
+govern one spawn. A *dedicated agent definition* (e.g.
+`.claude/agents/<name>.md`) is the **persistent craft layer underneath**: the
+project knowledge, hard invariants, and standing judgments a role carries into
+every spawn. Stock/generic agents are fine on day one; the dedicated layer is
+the steady state — and it is where escape-driven convergence (Part 3)
+accumulates *per role*, not just in the shared prompts.
+
+Rules of the pattern:
+
+- **The layered-prompt contract.** Every agent definition states it verbatim:
+  the orchestrator's invocation prompt (the Section C template) governs the
+  task and its rules; this file is persistent craft and judgment applied on
+  top; **if they ever conflict, the invocation prompt wins.** This keeps the
+  workflow's guarantees (read-only mandates, finding protocol, zero
+  tolerance) in exactly one evolving place — Section C — while the agent file
+  deepens, never overrides.
+- **Which roles get one.** Always Step 2 (test writer) and Step 3
+  (implementer) — they run every slice and accumulate the most project
+  judgment. Beyond those two, derive the roster from the SPEC using the
+  procedure below ("Deriving the project's specialist roster") rather than
+  guessing or copying another project's crew.
+- **Model pinning.** Pin the strongest model in the agent's frontmatter
+  (`model: …`) — never inherit a runner default. For stock agents with no
+  frontmatter to edit, the orchestrator passes the model override on every
+  spawn, and `AGENT_ASSIGNMENTS` records that obligation explicitly.
+- **Per-agent memory.** Each dedicated agent gets its own persistent memory
+  directory (e.g. `.claude/agent-memory/<name>/`): one fact per file, plus a
+  `MEMORY.md` index — one line per fact, never content, kept bounded (it is
+  loaded on every spawn). The agent definition embeds the directive. Memory
+  reflects what was true *when written*: the agent verifies a remembered fact
+  against the repo before acting on it. The repo, not memory, is the source
+  of truth.
+
+### Deriving the project's specialist roster (bootstrap procedure)
+
+Run this during Phase 0 Step 0.7 (and re-run it at each milestone checkpoint —
+a new milestone often opens a new surface). The derivation is **two-stage:
+signals trigger archetypes; the project's own stack decisions specialize
+them.** This document defines only the **core archetypes** — stack-agnostic
+role *shapes*. The concrete agents are deliberately not listed here, because
+they do not exist until the foundational §8 decisions (language, architecture
+shape, data tier, deployment target) give each triggered archetype its
+specific form. The roster is derived from the SPEC, proposed to the user, and
+demand-gated — never speculative.
+
+**1. Read the signals — which archetypes does this SPEC trigger?** Walk the
+frozen SPEC and note which of these the project actually commits to:
+
+| Signal in the SPEC | Core archetype | What it owns (in any stack) |
+|---|---|---|
+| §1 spine invariant is intricate domain correctness (conservation, state machines, regulated rules) | **Domain-expert reviewer** | The Step 4.5 slot: invariant hypothesis testing in the domain's own terms |
+| Hard latency / throughput / resource targets; hot paths | **Performance architect** | Hot-path review, measured ceilings, resource discipline |
+| Non-trivial persistence: schemas, transactions, migrations, query-shaped risk | **Data/persistence specialist** | Schema and query review, transaction semantics, migration safety |
+| Scale or infrastructure commitments: managed tiers, autoscaling, multi-region, cost envelopes | **Infra/scale architect** | Capacity math, deployment topology, scaling cliffs |
+| §7 trust boundaries: authn/authz, tenant isolation, secrets, partner-facing surface | **Security auditor** | The Step 4.6 slot (stock usually suffices until project judgment accumulates — then dedicate it) |
+| More than one deployable or module with contracts between them: microservices, a multi-module system, a frontend↔backend split | **Integration/contract specialist** | Every inter-part boundary as a drift-guarded contract; distributed failure semantics (retries, idempotency, ordering, schema evolution of events) |
+| A user-facing UI surface | **Frontend/UI specialist** | Component and state architecture, accessibility, browser-runtime verification |
+| A framework- or build-heavy platform: multi-module build graphs, monorepo workspaces, heavyweight frameworks | **Platform/build specialist** | Module/build-graph topology, dependency hygiene, framework idioms |
+| §6 testing strategy spans multiple tiers with container-heavy or flake-prone suites | **Test architect** | Tier placement and pyramid health — deliberately distinct from the Step 2 *author* |
+| A recurring, gnarly failure class (flakes, races, environment-sensitive breaks) | **Debugger** | Systematic root-causing; owns the failure-signature catalog |
+| CI/CD, IaC, or release phases in the roadmap | **Deployment engineer** | Pipeline, IaC review, release discipline |
+
+**2. Specialize each triggered archetype to the stack.** An archetype is a
+role shape, not an agent. Instantiate it in the terms of the §8 foundational
+decisions you just froze:
+
+- **Name it in stack terms** — `<stack>-<archetype>`, not the abstract label.
+- **Write its judgment in the stack's idioms.** What "hot path" means *here*:
+  allocation-free loops in one stack, GC pressure and pool sizing in another,
+  never blocking the event loop in a third. Same archetype, different craft.
+- **Seed its first standing standard** from the SPEC/PROJECT_CONTEXT rules
+  that archetype defends (its slice of the forbidden patterns, the relevant
+  hard invariants).
+- **Multiply the wiring surface, not just the roster.** A multi-deployable
+  architecture means one composition root per service (plus the frontend
+  bundle entry); list every one in PROJECT_CONTEXT "Production Entry Points"
+  so the Step 5.5 auditor traces each deployable, and give the
+  integration/contract specialist a drift guard per boundary.
+
+Worked examples — the same archetypes, three different instantiations:
+
+- *Single-language modular monolith over a managed SQL tier* → the
+  performance archetype becomes a language-level hot-path/allocation
+  architect; the infra archetype becomes a specialist on that managed tier's
+  scaling cliffs; the contract archetype owns the one external API's drift
+  guard.
+- *Java microservices, multiple Maven/Gradle modules* → the performance
+  archetype becomes a JVM specialist (GC, pools, framework lifecycle); the
+  integration/contract archetype owns inter-service API/event contracts with
+  a consumer-driven contract test per boundary; the platform archetype owns
+  the module graph and dependency hygiene.
+- *Node frontend + backend* → the frontend archetype owns components, state,
+  accessibility, and browser-runtime verification; the contract archetype
+  owns the frontend↔backend API as a drift-guarded contract; the platform
+  archetype owns the workspace/build graph.
+
+**3. Propose, don't create.** Present the specialized roster to the user in
+the same one-round-trip confirmation as the PROJECT_CONTEXT block: each
+proposed agent with one line of *why this project needs it* (cite the SPEC
+section and the §8 decision that shaped it) and its first standing standard.
+The user confirms, trims, or defers each.
+
+**4. Apply the no-empty-agent rule.** An agent definition with no
+project-specific judgment in it is a stock agent with a fancy name — do not
+create it. Specialization gives a day-one agent real content (its craft
+derives from the §8 stack decisions), but it still needs at least one
+project-specific standing standard to exist; otherwise **defer it** (record
+the deferral) and create it at the moment of first real signal — the first
+hot-path slice, the first flake class, the first capacity question. Deferring
+is the normal case for most of the table; the mandatory pair (Step 2 +
+Step 3) plus one or two SPEC-obvious specialists is a typical day-one roster.
+
+**5. Bind or pool each confirmed agent.** Two kinds of specialist, both built
+from the same template:
+- **Step-bound** — fills a numbered slot in `AGENT_ASSIGNMENTS` (Step 2, 3,
+  4.5, 4.6) and is spawned by the workflow every round.
+- **Consultation** — not bound to a step; the orchestrator spawns it ad hoc
+  for design questions, checkpoint audits, capacity math, or flake
+  root-causing. Record it in the agent layer anyway (definition + memory
+  directory) so its judgment persists between consultations.
+
+**6. Stand up each agent.** From the template below: definition file with
+pinned model, the layered-prompt contract verbatim, its first standing
+standard, and an empty memory directory with a blank `MEMORY.md` index.
+
+### Agent-definition template (fill the brackets)
+
+```markdown
+---
+name: <project>-implementer   # or behavioral-test-writer, <domain>-reviewer…
+description: <Role> for <Project>'s adversarial-development-workflow
+  Step <N>. <One sentence: what it does, and when the orchestrator
+  spawns it.>
+model: <strongest-available>  # pin explicitly — never inherit a default
+---
+
+You are the <role> for **<Project>** — <one-line project description>.
+You execute **Step <N>** of the adversarial development workflow.
+
+The orchestrator hands you the task, design doc, and step inputs in the
+invocation prompt (the workflow's Section C template). That prompt governs
+the task and its rules. This file is your **persistent craft, constraints,
+and judgment** — apply it on top; if they ever conflict, the invocation
+prompt wins.
+
+## Your job
+<The role's completion target restated in project terms — e.g., for an
+implementer: "correct, production-wired code reachable from <composition
+root>; every pre-written test passes for the right reasons; every reviewer
+finding gets a genuine fix.">
+
+## Project invariants you enforce
+<The PROJECT_CONTEXT rules this role most often defends, in this role's
+terms: hard invariants, forbidden patterns, required idioms.>
+
+## Standing standards
+<Operator-ratified judgments this role owns that outlive any one task —
+e.g., a test architect's tier-placement rules. Grows via Part 3's
+evolve-from-escapes loop.>
+
+## Memory
+You have a persistent file-based memory at
+`.claude/agent-memory/<name>/`. One fact per file; `MEMORY.md` is the
+index — one line per fact, never content, keep it bounded. Before acting
+on a remembered fact, verify it against the repo: memory reflects what
+was true when written; the repo is the source of truth.
+```
+
 ## The Steps in Detail
 
 **Step 0 — Bootstrap PROJECT_CONTEXT.** First run only; otherwise skip.
@@ -674,7 +872,7 @@ Classify by *effect on those two lists*, not by how the change is described.
 
 ## Institutional Memory (Persistent Across Sessions)
 
-Three durable records keep a cold-start Claude from re-deriving settled ground:
+Four durable records keep a cold-start Claude from re-deriving settled ground:
 1. **The §8 decision log** — *why* every design choice is what it is (+ rejected
    alternatives). Skim it on resume; never re-derive a frozen decision.
 2. **The DEBT-N ledger** — what was deliberately deferred and when it is due.
@@ -683,6 +881,43 @@ Three durable records keep a cold-start Claude from re-deriving settled ground:
    fact per file, linked. Memory is background context that reflects what was
    true *when written* — if it names a file/flag/function, **verify it still
    exists** before acting on it. The repo, not memory, is the source of truth.
+4. **Per-agent memory** (Part 2 § "Dedicated Agents") — each dedicated agent's
+   own memory directory, holding the role-scoped lessons a specialist would
+   otherwise re-derive expensively (a measured performance ceiling, an
+   operational invariant that isn't in the spec, a flake class root-caused
+   once). Same caveat as 3: verify against the repo before acting on it.
+
+## Is It Working? — Process Health Signals
+
+The process converges or it erodes; you do not get to assume which. These are the
+signals that say it is converging: **rounds-per-slice trending down** for slices of
+comparable complexity; **escapes-per-slice trending toward zero**; **zero flaky
+tests** holding (not creeping back as suppressions); the **forbidden-patterns list
+growing early then plateauing** (each escape adds one, then the class stops
+recurring); and **checkpoint audits finding less each time**.
+
+The data source is free. The commit-message convention already encodes the slice
+and round (`Sx Rx`) and the decisions (`Dxx`), so `git log --oneline` **is** the
+process dataset — one grep recovers rounds-per-slice, another the decision count.
+You do not instrument anything; the discipline that makes commits traceable makes
+them measurable.
+
+Calibration anchors from the reference project: a per-slice round count with a
+**median of ~3–4 and a maximum of 12** (the hardest slice), and **3 escapes across
+~18 slices** — each one now a permanent rule. Use those as a yardstick, not a
+target: a project whose numbers are wildly lower is more suspect than one whose
+numbers match.
+
+The warning sign that is **not** health: rounds dropping because the reviews got
+*softer*. Convergence and erosion both reduce round count, and they look identical
+on a graph. Distinguish them by mechanism — convergence means fewer findings
+because **earlier gates catch them or rules prevent them**; erosion means fewer
+findings because **rigor decayed**. So when rounds drop, ask *which gate is catching
+things now*: if escapes moved to Round 1 because a forbidden pattern or the Step 3.5
+grep now flags them, that is convergence. If the answer is "none — they just stopped
+finding things," re-read the meta-rule (§ "The meta-rule for any 'make it
+faster/cheaper' proposal"). A drop you cannot attribute to a specific gate is the
+erosion the whole process exists to prevent.
 
 ## Anti-Patterns to Watch For (the orchestrator's own failure modes)
 
