@@ -820,6 +820,12 @@ Discipline:
 - A commit message traces to the SPEC AC / `Dxx` / PLAN task it implements, and
   references any `DEBT-N` it touches by handle.
 
+This section assumes a single human/orchestrator pair — one ▶ pointer, one
+gate-then-commit pipeline. Running more than one pair? The team adaptation —
+lanes partitioned on the context boundary, a spec steward, a merge queue with
+a rebased-gate rule — is documented in **`TEAMS.md`**. The inner loop is
+untouched by it.
+
 ---
 
 # Part 3 — Checkpoints, Evolution, and Institutional Memory

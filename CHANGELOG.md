@@ -51,6 +51,9 @@ strict read-only mandates). Each is documented in `worked-example.md` and in
 - **The escape fold-back contract** — local fold-in plus upstream contribution.
 - **Process health signals** — convergence-vs-erosion diagnostics from the
   `git log` dataset.
+- **`TEAMS.md`** — the team adaptation: lanes partitioned on the lint-enforced
+  context boundary, the spec-steward role, the merge queue with the
+  rebased-gate rule, and the operator ceiling.
 
 ## v1
 

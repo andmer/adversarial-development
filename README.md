@@ -34,6 +34,7 @@ The exit condition is absolute: **every reviewer, zero findings, on the same rou
 | [`adversarial-development-workflow-template.md`](./adversarial-development-workflow-template.md) | **The inner loop, ready to run.** The verbatim, spawnable agent prompts (test writer, implementer, the three reviewers, wiring auditor), a fillable `PROJECT_CONTEXT` / `AGENT_ASSIGNMENTS` block, and a Step-0 self-bootstrap that populates it from your codebase. Drop it in; it adapts to your stack. |
 | [`OPERATOR.md`](./OPERATOR.md) | **The human's half of the protocol** — the five moments you must engage, the refusals you'll need to make, week-one calibration. |
 | [`worked-example.md`](./worked-example.md) | **A real slice's journey through the loop, annotated** — reconstructed from the reference project's history so you can calibrate what normal looks like. |
+| [`TEAMS.md`](./TEAMS.md) | **Scaling to more than one human/orchestrator pair** — the lane model, the spec steward, the merge queue, the rebased-gate rule, and the honest operator ceiling. |
 
 The two templates are **project-agnostic** — `[bracket]` placeholders, no language or framework lock-in. `OPERATOR.md` and `worked-example.md` are companions, not templates: one is the human's half of the protocol, the other is calibration.
 
