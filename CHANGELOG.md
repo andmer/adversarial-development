@@ -53,7 +53,8 @@ strict read-only mandates). Each is documented in `worked-example.md` and in
   `git log` dataset.
 - **`TEAMS.md`** — the team adaptation: lanes partitioned on the lint-enforced
   context boundary, the spec-steward role, the merge queue with the
-  rebased-gate rule, and the operator ceiling.
+  rebased-gate rule, the **frozen-since register** (`FRZ-N` — the mechanical
+  form of the cross-lane arithmetic check), and the operator ceiling.
 
 ## v1
 

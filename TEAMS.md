@@ -109,9 +109,13 @@ stale the moment the other merges. The fix is the industry's:
   trunk is **not** clean against today's. At queue time, after rebase:
   1. Re-run **Step 3.5** in full (including the fabricated-green re-run)
      against the rebased tree.
-  2. Re-check **Step 1.5's cross-slice arithmetic**: did any lane that merged
-     since this slice's review freeze a formula or threshold this slice's
-     test setups now interact with?
+  2. Run the **frozen-since check** (see the register below): grep the
+     slice's test diff for the greppable keys of every register row added
+     since this slice's review baseline. No hits → the cross-slice
+     arithmetic check passes mechanically. A hit → re-run Step 1.5's
+     check 6 for that specific (test, frozen formula) pair: compute,
+     via the newly frozen formula, whether the setup still matches the
+     test's stated premise.
   3. If the rebase touched the slice's own hunks, or check 2 fires, run **one
      delta-scoped review round** (changed hunks + one call-hop, per the
      existing fix-round rule) before merging. Reviewers review; the lane's
@@ -120,6 +124,56 @@ stale the moment the other merges. The fix is the industry's:
   has something to rebase, not as a place where work accumulates unreviewed.
   Incomplete user-facing work stays feature-flagged on trunk, exactly as
   before.
+
+### The Frozen-Since Register
+
+"Did any lane freeze a formula my test setups now interact with?" is, as
+stated, a judgment scan over an unbounded surface — the least mechanical
+check in this document, and therefore where the escapes will happen. The fix
+is the kit's standard move: turn the judgment scan into **a grep plus a
+bounded judgment on the hits** (the same design as the phantom-adapter grep
+and the "specific, greppable" forbidden-patterns rule).
+
+The register is a small append-only table in `PLAN.md` — which means the
+merge queue serializes writes to it for free:
+
+```
+| ID    | Merged            | What was frozen (cites Sx / Dxx)            | Greppable keys                          |
+|-------|-------------------|---------------------------------------------|-----------------------------------------|
+| FRZ-7 | a1b2c3d (date)    | Overnight financing: signed rate × notional | rollover, financing, value_date, any    |
+|       |                   | × days at the day boundary (S8d, D70)       | setup holding a position across a       |
+|       |                   |                                             | day boundary                            |
+```
+
+Rules:
+
+- **A merge that freezes a new formula, threshold, rate, calendar rule, or
+  contract shape adds a row.** The merging lane proposes it as part of the
+  merge-queue checklist; a freeze without a row is an incomplete merge. The
+  steward owns the register (it is law-adjacent) and audits it at cross-lane
+  checkpoints.
+- **The keys column is the load-bearing one.** Keys are what would appear in
+  a test setup that *interacts* with the frozen thing: symbols, config
+  fields, event types, table columns — and, crucially, **data-shape
+  triggers** ("any setup holding an open position across a day boundary"),
+  because a setup can interact with a formula without ever naming it.
+- **A row with no good greppable key is marked `KEYLESS`** — and a `KEYLESS`
+  row forces a judgment review of the merging slice's setups instead of a
+  grep. Small cost, rare case, fail-closed.
+- **Per-merge cost is bounded by interim traffic, not history.** Only rows
+  added since the slice's review baseline (`git merge-base` decides) are
+  checked. Old freezes were already in the baseline the slice's own Step 1.5
+  ran against.
+- **Key quality converges like everything else.** When an interaction slips
+  through because the keys missed it, that is an escape: add the missing key
+  class to the row and the lesson to the checklist. The register is a v1 on
+  day one, exactly like every other rule in the kit was.
+
+A fringe benefit that has nothing to do with teams: the register is a
+chronological index of every frozen formula — which is the checklist the
+single-operator Step 1.5 check 6 ("does this setup feed an already-shipped
+formula?") never had. Single-lane projects may keep one for that reason
+alone.
 
 The inner loop itself is untouched. Every slice, in every lane, still runs
 the full sequence — blind test writer, non-weakening implementer, parallel
@@ -130,8 +184,10 @@ Nothing in this document touches a slice's internals.
 multi-lane scale, add a periodic **steward-run cross-lane audit**: fresh
 agents hunting specifically for cross-lane drift — the cross-slice-arithmetic
 class at lane scope, contract assumptions that diverged, the same invariant
-defended differently in two contexts. This is the team-scale version of the
-checkpoint that has caught drift per-slice review missed.
+defended differently in two contexts. The steward also audits the
+frozen-since register here: a row for every interim freeze, keys that
+actually cover the interaction surface. This is the team-scale version of
+the checkpoint that has caught drift per-slice review missed.
 
 ---
 
@@ -169,6 +225,11 @@ Every adaptation above, classified the way the kit demands:
   reviews their own slice, no lane self-clears its rebase delta, no
   orchestrator skips independent verification, no NOTE becomes waivable.
   Acceptable.
+- **The frozen-since register** — changes HOW MUCH surface the rebased gate
+  re-reads (a grep over register keys instead of a judgment scan of
+  everything) and WHEN the interaction check runs. The judgment on a hit is
+  still a reviewer's, a `KEYLESS` row still fails closed to full judgment,
+  and a key that misses still lands in the escape→rule loop. Acceptable.
 
 Anything a team proposes beyond this document gets the same classification —
 by effect, not description. Parallelism pressure is efficiency pressure, and
