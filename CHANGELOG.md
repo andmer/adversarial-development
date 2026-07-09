@@ -56,6 +56,20 @@ strict read-only mandates). Each is documented in `worked-example.md` and in
   rebased-gate rule, the **frozen-since register** (`FRZ-N` — the mechanical
   form of the cross-lane arithmetic check), and the operator ceiling.
 
+### 2026-07-08 — Step 0.5: project agent-roster generation
+
+- **Step 0.5 (Derive & Generate the Project's Agent Roster)** — a first-run
+  step in the executable template, between Step 0 and Step 1. It folds the
+  `build-methodology.md` roster-derivation procedure into the inner-loop playbook
+  so an orchestrator running the template standalone actually generates **this
+  project's tech- and domain-specialized agents** — the mandatory Step 2/3 pair
+  plus the SPEC-obvious specialists — instead of falling back to stock
+  `general-purpose`. Deriving is mandatory; creation stays demand-gated
+  (no-empty-agent rule, propose-don't-create). `AGENT_ASSIGNMENTS` now documents
+  the stock names as a pre-bootstrap fallback that Step 0.5 overwrites, and the
+  Overview diagram, the "Read This First" responsibilities, and the step sequence
+  (`0 → 0.5 → 1 → …`) are updated to match.
+
 ## v1
 
 Original release — the core adversarial inner loop: a blind test writer (writes

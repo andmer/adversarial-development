@@ -8,11 +8,12 @@ When the user invokes this file (e.g., "implement issue #313, follow @adversaria
 
 **Your immediate responsibilities:**
 1. **Bootstrap PROJECT_CONTEXT if needed** (see Step 0 below). Check Section A. If any field still contains placeholder text in `[brackets]`, populate it by exploring the codebase and confirm with the user before proceeding.
-2. **Gather task inputs** from the user's message and any linked issues/PRs/specs.
-3. Execute **Steps 0 → 1 → 2 → 1.5 → 3 → 3.5 → 4 + 4.5 + 4.6 (parallel) → 5 (iterate) → 5.5 → 6** in order. You may NOT skip, combine, reorder, or "streamline" any step. Note the fractional steps happen *between* the numbered steps: 1.5 runs after Step 2 (validates test coverage before handing to the implementer); **3.5 runs after Step 3 — the orchestrator's own cheap mechanical gate before any reviewer spawns**; 4.5 and 4.6 run alongside Step 4 (all configured reviewers in parallel, one message); 5.5 runs after Step 5.
-4. For each step, spawn the required subagent via the **`Agent` tool** using the `subagent_type` from `AGENT_ASSIGNMENTS` in Section A, passing the prompt template from Section C with runtime values (`{PROJECT_CONTEXT}`, `{task_description}`, `{design_doc}`, `{deliverables_checklist}`, `{behavioral_tests_from_step_2}`, `{implementation_output_from_step_3}`, `{files_changed}`, `{finding_tracker}`) substituted from context. **Spawn every judgment-bearing agent on the strongest model available to you** (see AGENT_ASSIGNMENTS "Model tiering") — a downgraded reviewer or auditor is a silent hole in the chain.
-5. Maintain the **Finding Tracker** (`OPEN → GENUINELY_FIXED | SHAM_FIX | NOT_ADDRESSED | PARTIALLY_FIXED | REBUTTED`) across all review rounds.
-6. Only report success when the zero-tolerance exit condition is met.
+2. **Derive and generate this project's agent roster if needed** (see Step 0.5 below). The workflow-stage agents — the Step 2 test writer, the Step 3 implementer, and every configured reviewer/auditor — must run on **this project's tech- and domain-specialized dedicated agents**, not stock `general-purpose`. If `AGENT_ASSIGNMENTS` still names stock defaults, derive the roster from PROJECT_CONTEXT (and the SPEC/design doc), propose it, generate the confirmed agents, and write them back into Section A before proceeding.
+3. **Gather task inputs** from the user's message and any linked issues/PRs/specs.
+4. Execute **Steps 0 → 0.5 → 1 → 2 → 1.5 → 3 → 3.5 → 4 + 4.5 + 4.6 (parallel) → 5 (iterate) → 5.5 → 6** in order. You may NOT skip, combine, reorder, or "streamline" any step. Note the fractional steps happen *between* the numbered steps: **0.5 runs after Step 0 (first run only — derives and generates this project's agents)**; 1.5 runs after Step 2 (validates test coverage before handing to the implementer); **3.5 runs after Step 3 — the orchestrator's own cheap mechanical gate before any reviewer spawns**; 4.5 and 4.6 run alongside Step 4 (all configured reviewers in parallel, one message); 5.5 runs after Step 5.
+5. For each step, spawn the required subagent via the **`Agent` tool** using the `subagent_type` from `AGENT_ASSIGNMENTS` in Section A, passing the prompt template from Section C with runtime values (`{PROJECT_CONTEXT}`, `{task_description}`, `{design_doc}`, `{deliverables_checklist}`, `{behavioral_tests_from_step_2}`, `{implementation_output_from_step_3}`, `{files_changed}`, `{finding_tracker}`) substituted from context. **Spawn every judgment-bearing agent on the strongest model available to you** (see AGENT_ASSIGNMENTS "Model tiering") — a downgraded reviewer or auditor is a silent hole in the chain.
+6. Maintain the **Finding Tracker** (`OPEN → GENUINELY_FIXED | SHAM_FIX | NOT_ADDRESSED | PARTIALLY_FIXED | REBUTTED`) across all review rounds.
+7. Only report success when the zero-tolerance exit condition is met.
 
 **Do NOT write production code yourself.** You are the orchestrator. The implementation agent writes code. Your job is process discipline.
 
@@ -143,14 +144,21 @@ contradict its own premise). Examples to adapt:
 ### AGENT_ASSIGNMENTS
 
 ```
-Step 2   — Test Writer:               general-purpose   (or a dedicated test-writer agent)
-Step 3   — Implementation:            general-purpose   (or a dedicated implementer agent)
+# Step 0.5 POPULATES this block with THIS project's derived, stack-specialized
+# dedicated agents (see Step 0.5). The stock names below are the PRE-BOOTSTRAP
+# FALLBACK only — after Step 0.5 each slot should name a project agent (e.g.
+# `<stack>-implementer`, `<domain>-reviewer`), or keep the stock name AND record
+# the per-spawn model-override obligation for any slot deferred/not-yet-specialized.
+
+Step 2   — Test Writer:               general-purpose   (→ dedicated <stack>-test-writer — always specialize)
+Step 3   — Implementation:            general-purpose   (→ dedicated <stack>-implementer — always specialize)
 Step 4   — Process Reviewer:          code-reviewer     (or: general-purpose)
-Step 4.5 — Domain Expert Reviewer:    [empty to skip, or: backend-architect,
-                                       a low-latency/data/domain specialist, etc.]
+Step 4.5 — Domain Expert Reviewer:    [empty to skip, or the derived
+                                       <domain>/<stack> specialist Step 0.5 proposes —
+                                       e.g. a low-latency/data/domain reviewer]
 Step 4.6 — Security Auditor Reviewer: security-auditor  [mandatory for security-
                                        relevant changes — see below; recommended
-                                       otherwise]
+                                       otherwise. Dedicate once project judgment accrues.]
 Step 5.5 — Production Wiring Auditor:  general-purpose
 
 ## Model tiering
@@ -168,18 +176,21 @@ silent hole in the chain. (If your agent runner lets you pin a model per spawn,
 pin the strongest one explicitly — do not rely on a sub-agent's default.)
 ```
 
-**Dedicated agents are the recommended steady state for Steps 2 and 3** (and
-for any reviewer slot where project-specific judgment has accumulated): a
-project-named agent definition with the model pinned in its frontmatter, a
-persistent-craft prompt layered *under* the Section C invocation ("the
-invocation prompt governs the task; this file is craft applied on top; on
+**Step 0.5 generates the agents that fill this block** — always a dedicated
+Step 2 test writer and Step 3 implementer specialized to the stack, plus every
+SPEC-obvious tech/domain specialist the project triggers. Each dedicated agent
+is a project-named definition with the strongest model pinned in its
+frontmatter, a persistent-craft prompt layered *under* the Section C invocation
+("the invocation prompt governs the task; this file is craft applied on top; on
 conflict the invocation prompt wins"), and a per-agent memory directory. The
-pattern, a fillable agent-definition template, and a procedure for deriving
-which specialists THIS project needs from its SPEC live in
-`build-methodology.md` Part 2 § "Dedicated Agents". Stock agents are fine to
-start — record whichever
-you use here, and for any stock agent whose model cannot be pinned in
-frontmatter, record the orchestrator's per-spawn model-override obligation.
+condensed derivation loop is embedded in Step 0.5 (executable from this file
+alone); the full procedure, worked examples, and a fillable agent-definition
+template live in `build-methodology.md` Part 2 § "Dedicated Agents". Creation is
+**demand-gated** — you always DERIVE the full roster, but you only CREATE agents
+carrying real project-specific judgment now and defer the rest (Step 0.5, the
+no-empty-agent rule). For any slot still on a stock agent whose model cannot be
+pinned in frontmatter, record the orchestrator's per-spawn model-override
+obligation.
 
 Step 4.5 is recommended for any change touching security, performance-critical paths, data integrity, or regulated domains. **Step 4.6 (Security Auditor) is mandatory for any change touching authentication/authorization, multi-tenant or multi-user isolation, input parsing/validation, secrets or credential handling, cryptography, error/log output, or supply-chain/dependencies; recommended otherwise (a clean security pass on a non-security change is cheap and calibrates trust).** Step 4.6 is distinct from Step 4.5: the domain-expert reviews correctness/invariants/performance; the security auditor reviews the *adversary's* view (threat model, exploitability, fail-open vs fail-closed). Step 5.5 is **mandatory** — it's the last line of defense against phantom wiring.
 
@@ -193,6 +204,8 @@ Step 4.5 is recommended for any change touching security, performance-critical p
 User gives task to Orchestrator (you)
          v
   [Step 0]  Bootstrap PROJECT_CONTEXT (first run only; skip if already filled)
+         v
+  [Step 0.5] Derive & generate project's tech/domain agents (first run only)
          v
   [Step 1]  Receive task + Ambiguity Sweep (raise all open axes at once)
          v
@@ -253,7 +266,112 @@ Check Section A. If any field is still in `[bracketed placeholder]` form, do thi
 4. **Write the confirmed block back into Section A of this file.** Use the `Edit` tool on this same file — **self-modification is the intended behavior** for the one-time bootstrap; do not hesitate. Replace every `[bracketed placeholder]` with the confirmed content.
 5. Proceed to Step 1.
 
-If Section A has no placeholders, skip Step 0 and go straight to Step 1.
+If Section A has no placeholders, skip Step 0 and go straight to Step 0.5.
+
+### Step 0.5: Derive & Generate the Project's Agent Roster (First Run Only)
+
+The workflow-stage agents must be **this project's** agents — tech- and
+domain-specialized dedicated agents, not stock `general-purpose`. After Step 0
+(and re-run at any milestone that opens a new surface), derive the roster from
+PROJECT_CONTEXT (and the project's SPEC / roadmap, if it has one — otherwise
+PROJECT_CONTEXT plus the task's design doc carry the signals), generate the
+confirmed agents, and write them into `AGENT_ASSIGNMENTS`. Deriving is
+**mandatory on first run**; *creation*
+is **demand-gated** — you always derive the full roster, but you only create the
+agents that carry real project-specific judgment now (the no-empty-agent rule,
+step 5), deferring the rest.
+
+If `AGENT_ASSIGNMENTS` already names project-specialized agents (not the stock
+fallbacks), Step 0.5 is done for this surface — skip to Step 1. Re-run Step 0.5
+at a milestone checkpoint when a new surface appears (first UI, first persistence
+tier, first external contract).
+
+*(The condensed loop below is self-sufficient to execute from this file alone.
+The full procedure, three worked instantiations, and a fillable agent-definition
+template live in `build-methodology.md` Part 2 § "Dedicated Agents".)*
+
+**1. Always specialize the mandatory pair.** Steps 2 (test writer) and 3
+(implementer) run every slice and accumulate the most project judgment — they
+ALWAYS get a dedicated agent, named and written in the stack's idioms.
+
+**2. Read the signals — which specialist archetypes does this project trigger?**
+Walk PROJECT_CONTEXT (and the SPEC / design doc); note which rows the project
+actually commits to (skip the ones it doesn't touch):
+
+| Signal in PROJECT_CONTEXT / SPEC | Core archetype | Typical binding |
+|---|---|---|
+| Intricate domain correctness (conservation, state machines, regulated rules) | Domain-expert reviewer | Step 4.5 |
+| Hard latency / throughput / resource targets; hot paths | Performance architect | Step 4.5 |
+| Non-trivial persistence: schemas, transactions, migrations, query-shaped risk | Data/persistence specialist | Step 4.5 / consult |
+| Trust boundaries: authn/authz, tenant isolation, secrets, partner-facing surface | Security auditor | Step 4.6 |
+| More than one deployable/module with contracts between them | Integration/contract specialist | Step 4.5 / consult |
+| A user-facing UI surface | Frontend/UI specialist | Step 4.5 / consult |
+| Framework-/build-heavy platform: monorepo, heavy build graph | Platform/build specialist | Consult |
+| Multi-tier, container-/flake-prone test suites | Test architect (distinct from the Step 2 author) | Consult |
+| A recurring, gnarly failure class (flakes, races, env-sensitive breaks) | Debugger | Consult |
+| CI/CD, IaC, or release phases in the roadmap | Deployment engineer | Consult |
+
+**3. Specialize each triggered archetype to the stack.** An archetype is a role
+*shape*, not an agent — instantiate it in the terms of PROJECT_CONTEXT's tech
+stack:
+- **Name it in stack terms** — `<stack>-<archetype>` (e.g. `rust-lowlatency-reviewer`,
+  `postgres-data-specialist`), never the abstract label.
+- **Write its judgment in the stack's idioms.** "Hot path" means allocation-free
+  loops in one stack, GC-pressure/pool-sizing in another, never-block-the-event-loop
+  in a third — same archetype, different craft.
+- **Seed its first standing standard** from the PROJECT_CONTEXT rules it defends
+  (its slice of the Forbidden Patterns; the relevant hard invariants).
+- **Multiply the wiring surface, not just the roster.** A multi-deployable
+  architecture means one composition root per service (plus any frontend bundle
+  entry) — list every one in PROJECT_CONTEXT "Production Entry Points" so the
+  Step 5.5 auditor traces each, and give the integration/contract specialist a
+  drift guard per boundary.
+
+**4. Propose, don't silently create.** Present the specialized roster to the user
+in ONE round-trip — fold it into the same confirmation as the Step 0
+PROJECT_CONTEXT block when both run on this invocation. For each proposed agent
+give one line of *why this project needs it* (cite the PROJECT_CONTEXT/SPEC signal
+and the stack decision that shaped it) and its first standing standard. The user
+confirms, trims, or defers each. Do not proceed until they do.
+
+**5. Apply the no-empty-agent rule.** An agent definition with no
+project-specific judgment is a stock agent with a fancy name — do not create it.
+Specialization gives a day-one agent real content, but it still needs at least one
+project-specific standing standard to exist; otherwise **defer it** (record the
+deferral) and create it at the first real signal — the first hot-path slice, the
+first flake class, the first capacity question. Deferring is the normal case for
+most of the table; the mandatory pair (Step 2 + Step 3) plus one or two
+SPEC-obvious specialists is a typical day-one roster.
+
+**6. Stand up each confirmed agent.** Write a definition file
+(`.claude/agents/<name>.md`, or your runner's equivalent) containing:
+- **Frontmatter with the strongest model pinned** (`model: <strongest-available>`)
+  — never inherit a runner default. For a stock agent whose frontmatter you cannot
+  edit, record the per-spawn model-override obligation in `AGENT_ASSIGNMENTS`
+  instead.
+- **The layered-prompt contract, verbatim:** "The orchestrator's invocation prompt
+  (the Section C template) governs the task and its rules. This file is persistent
+  craft and judgment applied on top. If they ever conflict, the invocation prompt
+  wins." This keeps the workflow's guarantees in exactly one evolving place
+  (Section C) while the agent file only deepens.
+- **Its job** (the step's completion target in project terms), the **project
+  invariants it enforces** (its slice of the Forbidden Patterns / hard invariants),
+  and its **first standing standard**.
+- **A per-agent memory directive** pointing at its own directory
+  (`.claude/agent-memory/<name>/`): one fact per file, a bounded `MEMORY.md` index,
+  verify-against-repo-before-acting. Create the directory with a blank `MEMORY.md`.
+
+Two kinds of specialist, both from this template: **step-bound** (fills a numbered
+slot — Step 2, 3, 4.5, 4.6 — and is spawned every round) and **consultation**
+(spawned ad hoc for design questions, capacity math, or flake root-causing; record
+its definition + memory directory anyway so its judgment persists between calls).
+
+**7. Write the roster back into `AGENT_ASSIGNMENTS` (Section A).** Replace each
+stock placeholder with the confirmed dedicated agent's `name`. Use the `Edit` tool
+on this same file — **self-modification is the intended behavior for bootstrap**,
+exactly as in Step 0. For every slot still on a stock agent (a deferred specialist,
+or a slot the project does not trigger), keep the stock name AND record the
+orchestrator's per-spawn model-override obligation. Then proceed to Step 1.
 
 ### Step 1: Receive the Task + Ambiguity Sweep
 
