@@ -24,6 +24,9 @@ The work is split across agents with deliberately conflicting incentives:
 
 The exit condition is absolute: **every reviewer, zero findings, on the same round.** Not "mostly clean." Zero.
 
+**The third thing — what neither loop can see on its own.**
+Both loops compare artifacts derived from the same understanding: tests against code, coverage against lines, reviews against diffs. All of it finds *contradictions inside* the system. None of it finds an **absence** — a behavior that silently stops happening, where nothing written is wrong and something unwritten is missing. No test fails, no build breaks, there is no diff to review, and every gate reports green. So the SPEC carries a **standing-obligations register** (§14) of what users are owed and must keep being owed — authored by the human, because it is the only input not derived from the system — and each obligation is proven by a check that enters through the **production front door**, the one verification method that fails differently from every other check in the kit.
+
 ---
 
 ## What's in here
@@ -32,7 +35,7 @@ The exit condition is absolute: **every reviewer, zero findings, on the same rou
 |------|------|
 | [`build-methodology.md`](./build-methodology.md) | **The outer loop + the whole method.** How a system is conceived, specified, planned, governed, and built slice by slice. The bootstrap playbook a fresh agent reads to stand up SPEC / PLAN / the decision log / the gate ladder / `CLAUDE.md` / the dedicated agent layer on a greenfield project. Self-contained: it also summarizes the inner loop. |
 | [`adversarial-development-workflow-template.md`](./adversarial-development-workflow-template.md) | **The inner loop, ready to run.** The verbatim, spawnable agent prompts (test writer, implementer, the three reviewers, wiring auditor), a fillable `PROJECT_CONTEXT` / `AGENT_ASSIGNMENTS` block, and a Step-0 self-bootstrap that populates it from your codebase. Drop it in; it adapts to your stack. |
-| [`OPERATOR.md`](./OPERATOR.md) | **The human's half of the protocol** — the five moments you must engage, the refusals you'll need to make, week-one calibration. |
+| [`OPERATOR.md`](./OPERATOR.md) | **The human's half of the protocol** — the six moments you must engage (including the one where you supply what the agents cannot derive: what users are owed), the refusals you'll need to make, week-one calibration. |
 | [`worked-example.md`](./worked-example.md) | **A real slice's journey through the loop, annotated** — reconstructed from the reference project's history so you can calibrate what normal looks like. |
 | [`TEAMS.md`](./TEAMS.md) | **Scaling to more than one human/orchestrator pair** — the lane model, the spec steward, the merge queue, the rebased-gate rule, and the honest operator ceiling. |
 
@@ -86,6 +89,11 @@ years later:
 - **Debt entry (`DEBT-N`)** — the stable handle for consciously-deferred
   work, held in the PLAN's carried-debt ledger. Cited by ID in commits, PRs,
   audits, and decisions — never by a prose phrase.
+- **Standing obligation (`OB-n`)** — a row in the SPEC's **§14 liveness
+  register**: something users are owed that must **keep happening**, with the
+  greppable keys that signal a change might threaten it and the front-door
+  proof that witnesses it. Authored by the operator, not by an agent — it is
+  the one input to the process not derived from the process.
 
 ---
 
@@ -95,7 +103,7 @@ The org-chart analogy writes itself. You'd never let the engineer who wrote a fe
 
 Two design choices keep it honest over time:
 
-- **Rules evolve from escapes.** Every bug that slips past all the agents becomes a new permanent check. The process converges instead of repeating the same class of mistake.
+- **Rules evolve from escapes.** Every bug that slips past all the agents becomes a new permanent check. The process converges instead of repeating the same class of mistake. Two constraints keep that convergence honest: a new check must **use a different method** from the ones that already missed the class (four keyword searches that agree are one keyword search run four times), and where the root cause is a claim nothing can falsify, the fix is to **convert the assertion into a derivation or a check** — don't state the count, derive it; don't assert the invariant, make its violation loud.
 - **A meta-rule separates efficiency from erosion.** An optimization is *fine* if it only changes **when** a check runs, **how much** surface is re-read, **which model** runs a mechanical step, or **how deep** verification goes. It's *erosion* if it changes **who** validates, **whether** you independently verify, or **whether** a finding can be waived. "It only saves a round" is how erosion is always sold.
 
 ---
@@ -117,6 +125,17 @@ a financing adapter that was **green in every test and inert in the shipping
 binary**: real values existed only behind a test-only seam, so the feature would
 have shipped doing nothing, forever. That defect is invisible to a single-agent
 loop. It is the class this process exists to catch.
+
+The standing-obligations register (§14) adds its own cost, and it is honest to
+separate the one-time part from the recurring part. **Recurring: a grep per
+slice and a suite run per checkpoint — zero new agent spawns.** One-time: most
+existing test suites enter mid-system, so when you first adopt this most rows
+will be marked `PROOF-INTERIOR` — obligations you have *named* but cannot yet
+*prove from the front door*. Building those proofs is real work, paid once per
+obligation. It buys a number you could not previously state: **the worst-case
+time a silently-broken user-facing behavior can survive is one slice.** Before
+the register, that number is however long it takes someone to notice by
+accident — in the reference project, two months.
 
 Apply the full loop where the cost of a production bug exceeds the cost of the
 process. The convergence mechanism is what makes the trade pay off over time:

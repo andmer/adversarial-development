@@ -1,4 +1,4 @@
-# Build Methodology — Spec-Driven Genesis + Adversarial Execution (v1)
+# Build Methodology — Spec-Driven Genesis + Adversarial Execution (v2)
 
 > A portable, project-agnostic playbook for building a high-assurance software
 > system from scratch and keeping its design honest as it grows. Hand this file
@@ -48,8 +48,8 @@ process exists to defeat. Run the step.
 
 ```
 OUTER LOOP — Governance (this playbook, Parts 1 & 3)
-  idea ──► SPEC (frozen, versioned, §8 decision log = ADR record)
-            │
+  idea ──► SPEC (frozen, versioned, §8 decision log = ADR record,
+            │     §14 standing obligations = the liveness register)
             ▼
           PLAN (Foundation + demand-gated slices; ▶ resume pointer; DEBT-N ledger)
             │
@@ -74,6 +74,18 @@ applies it to code (the author never reviews their own code; tests are written
 by someone who never sees the implementation). The outer loop applies it to
 design (a decision is never made mid-build; it is a versioned, dated, rationale-
 bearing record that is never silently re-litigated).
+
+**What both loops share is also their shared blind spot.** Every check in either
+loop compares two artifacts derived from the same understanding, so together
+they find contradictions *inside* the system and never an **absence** — a
+behavior that silently stops happening, where nothing written is wrong and
+something unwritten is missing. No test fails, no build breaks, there is no diff
+to review, every gate is green. That is why the SPEC carries **§14**, a register
+of what users are owed authored by the *operator* rather than derived from the
+code, proven by checks that enter through the production front door, and swept
+at Step 1.5, re-verified at Step 5.5, and fully re-executed at every checkpoint.
+It is the only part of this methodology whose input does not come from the
+methodology.
 
 ### How this maps onto generic "skills" (Superpowers / agent-skills)
 
@@ -235,9 +247,75 @@ workable section layout (an example — adapt the section set to your system):
 11. Permanent non-goals   — true NEVER, definitional
 12. Milestone roadmap     — everything committed; milestones are ORDER not maybe
 13. Cross-cutting / operational requirements
+14. Standing obligations  — the liveness register (what must KEEP happening) ◄── the absence class
 ```
 
 The status header makes the resume cheap: `FROZEN vX.Y (D1–Dn, <date>)`.
+
+### §14: Standing Obligations (the liveness register)
+
+**Look at §7 and §11.** Boundaries — "what NEVER happens." Permanent non-goals —
+"true NEVER." Both are **safety** properties: nothing bad happens, violated by a
+finite trace, witnessable by a test. There is no section in that list for
+**liveness** — something good *keeps* happening — and that omission is not
+cosmetic. Test suites accrete safety properties naturally because they are cheap
+and always terminate, so a mature suite drifts toward being comprehensively
+safety-checked and structurally blind to liveness. §14 is §7's missing twin.
+
+The defect class it exists for: **nothing written is wrong; something unwritten
+is missing.** Two slices are each independently correct and their composition
+belongs to nobody, so a shipped behavior silently stops happening while
+conservation, balance, determinism, and isolation all still hold. No test fails.
+No build breaks. There is no diff to review, because the defect is an absence.
+
+```
+| ID   | Owed to the user (what must KEEP happening)  | Since   | Keys / triggers                    | Proof              |
+|------|----------------------------------------------|---------|------------------------------------|--------------------|
+| OB-3 | A resting stop-loss fires when price crosses  | S4, D61 | KEYLESS — any change to order      | TestStopFiresOn    |
+|      | its trigger                                  |         | lifecycle, replace, or match loop  | Cross              |
+| OB-7 | Every fill emits a ledger entry              | S2      | ledger., emitFill, OnMatch         | TestFillLedgers    |
+```
+
+- **`OB-n`** is the stable handle — cite it in commits, findings, audits, and
+  decisions, never a prose phrase.
+- **Keys / triggers** is the load-bearing column, same contract as TEAMS.md's
+  `FRZ-N`: symbols, config fields, event types, table columns, **plus data-shape
+  triggers** ("any change to the order lifecycle"), because a change can break
+  an obligation without ever naming it. A row with no adequate key is marked
+  **`KEYLESS`** and fails closed to a judgment call. Expect `KEYLESS` to be the
+  *common* case here — a liveness property often has no symbol to grep, which is
+  precisely why it escapes.
+- **Proof must enter through the front door.** The named check must invoke a
+  declared Production Entry Point and assert only on user-observable output,
+  against the production composition root with no test-only seams. A proof that
+  constructs its scenario mid-system is marked **`PROOF-INTERIOR`** and treated
+  as an *unproven* obligation, tracked as `DEBT-N` until a real proof exists.
+
+**Why the front door is non-negotiable.** Every other check in this methodology
+is *analysis of an artifact* — tests analyze assertions, coverage analyzes
+traces, reviewers analyze diffs, the wiring auditor statically traces call
+chains. Execution through a production entry point is the only method that
+fails *differently*, and it is what a human QA is actually doing when they catch
+this class in a single session. A test that enters mid-system stays green
+forever while production is rerouted around it.
+
+**Mutation is a versioned SPEC revision plus a `Dxx` row**, like any other law
+change. Retiring or rewording an obligation requires rationale and rejected
+alternatives on the record.
+
+**Who authors it.** The operator, not an agent. This register is the only input
+to the process that is not derived from the process — an agent authoring it
+would derive it from the design doc and the code, closing the exact loop it
+exists to break. Agents may *propose* rows (seeded mechanically by grepping the
+shipped suite for liveness-shaped assertions: "X fires / emits / is produced");
+the operator rules ADD or REJECT, and adds what no test suggested. See
+`OPERATOR.md` Moment 6. **The seed is derivation from inside the loop — it kills
+the blank page for already-shipped work and confers no independence.**
+
+How it is enforced: **Step 1.5 check 7** (threat-scoped sweep), the **Step 5.5
+mirror section** (the wiring audit run backwards, deriving its own scope),
+the **Step 6 totality gate**, and **full re-verification at each slice-complete
+checkpoint** — see Part 2 and Part 3.
 
 ## The §8 Decision Discipline (The Heart of the Outer Loop)
 
@@ -279,6 +357,14 @@ Rules that bite:
 - **Plain language, not legalese.** Present decisions and §8 raises in plain
   words to the user; the codename/ID trail goes in the written row, not the
   question you ask.
+- **A decision that REDEFINES an existing term must enumerate the artifacts
+  citing it.** The enumeration is part of the row — list every spec section,
+  §14 obligation, PLAN entry, forbidden pattern, agent prompt, and comment that
+  uses the word, and state what each now means. A `Dxx` that redefines a word
+  silently inverts every artifact that cited the old definition, and the
+  inversion is invisible because *nothing in either artifact changed*. (Escape
+  that produced this rule: a decision redefined "terminal"; a catalog entry
+  citing the old meaning silently inverted — in the dangerous direction.)
 
 ### The Ambiguity Sweep (raise them all at once)
 
@@ -663,6 +749,16 @@ Step 2, before Step 3:
   verify the arithmetic matches the test's stated premise. A setup that silently
   crosses a boundary the test assumes never fires is a FAIL — catch it here, not
   at review.
+- *Standing obligations (7):* checks 1–6 all enumerate from THIS slice's design
+  doc, so a behavior a prior slice shipped is out of scope by construction. For
+  every **SPEC §14** row, grep this slice's design doc and Step-2 tests for its
+  keys; a `KEYLESS` row takes a forced judgment call and **fails closed**
+  (unclear = hit). Every hit needs a test proving the obligation still holds
+  before Step 3. Record the result for every row — Step 6's totality gate
+  verifies none went unexamined. This is the Ambiguity Sweep's axis 5
+  (cadence/when-fires) turned backwards: axis 5 asks when *this* slice's
+  behavior fires, check 7 asks whether every *prior* slice's behavior still
+  does.
 
 **Step 3 — Implement (Implementer agent).** Makes the pre-written tests pass.
 **May NOT weaken assertions** (change expected values, remove assertions, add
@@ -746,12 +842,30 @@ is **never called from production.** Any `PHANTOM_WIRED`/`STUB_ONLY` → back to
 the implementer. Also read-only (reason about the removal test, describe the
 deletion; the orchestrator runs any destructive proof).
 
-**Step 6 — CI gate + report.** Run CI at depth matched to change risk:
-behavior-change → the full end-of-slice gate; hygiene-only iteration → the cheap
-checks + targeted tests. **The FINAL commit is ALWAYS preceded by one full
-gate**, regardless of how intermediate iterations were gated. Report the facts:
-files changed, each reviewer's clean assessment, the finding-tracker summary
-(rounds, total findings, final status each), and the verify command. Do not
+In the same spawn it answers the **mirror** question — *is every standing
+obligation still reachable from production?* — classifying each in-scope **SPEC
+§14** row `STILL_FIRES | BROKEN | UNPROVEN`. A behavior that silently stopped
+happening is a wiring audit run backwards. **The auditor derives its own
+obligation scope** — every Step-1.5 hit, **plus every `KEYLESS` row
+unconditionally**, plus every row whose keys hit the actual diff. It must not
+inherit Step 1.5's hit list: a row whose keys were drafted too narrowly is
+invisible at 1.5, and two gates sharing one blind spot are one gate. `UNPROVEN`
+is not a soft pass — an obligation may not be discharged by failing to find
+evidence. Any `BROKEN`/`UNPROVEN` → back to the implementer, exactly like
+`PHANTOM_WIRED`.
+
+**Step 6 — CI gate + totality gate + report.** Run CI at depth matched to change
+risk: behavior-change → the full end-of-slice gate; hygiene-only iteration → the
+cheap checks + targeted tests. **The FINAL commit is ALWAYS preceded by one full
+gate**, regardless of how intermediate iterations were gated. Then run the
+**standing-obligation totality gate** (orchestrator-run): every §14 row was
+swept, every row in the Step-5.5 scope carries a verdict, every Proof names a
+check that exists and runs. **This gate proves coverage, not correctness** — a
+`PROOF-INTERIOR` check can stay green while production is rerouted around it, so
+a green totality gate is never evidence that an obligation holds. Report the
+facts: files changed, each reviewer's clean assessment, the finding-tracker
+summary (rounds, total findings, final status each), the obligation verdicts and
+any outstanding `PROOF-INTERIOR` rows, and the verify command. Do not
 editorialize about thoroughness.
 
 ## The Finding Tracker
@@ -843,6 +957,36 @@ At a slice-complete checkpoint the default is **fix-now over defer.** Only
 cosmetic or genuinely forward-bound items may become `DEBT-N`; surface the
 inconsequentiality judgment explicitly in the gate questions, never by silence.
 
+### Full standing-obligation re-verification (the latency bound)
+
+**At each slice-complete checkpoint, execute EVERY SPEC §14 Proof** — all rows,
+regardless of what the slice touched.
+
+The per-slice checks (Step 1.5 check 7, Step 5.5) are **threat-scoped**: they
+examine the obligations *this slice appears to threaten*. That leaves an
+unbounded failure mode. If a slice breaks an obligation and the sweep does not
+flag it — keys drafted too narrowly, a `KEYLESS` judgment that guessed wrong —
+then no *later* slice re-examines that row either, because no later slice
+threatens it. The obligation stays broken indefinitely and is found by accident,
+months later. A human QA does not ask "what did you change?" before a regression
+pass; they re-run everything. This is that.
+
+It is cheap: §14 Proofs are executable by contract, so this is a suite run, not
+a judgment sweep. And it is what converts detection latency from unbounded to
+**one slice**:
+
+| Configuration | Worst-case survival of a broken obligation |
+|---------------|--------------------------------------------|
+| No register | Unbounded — found by accident |
+| Threat-scoped per-slice checks only | Unbounded, if the sweep misses once |
+| **\+ full re-verification each slice-complete** | **One slice** |
+
+A `PROOF-INTERIOR` row cannot be discharged here — it has no executable
+front-door proof, so it takes an explicit judgment verdict and stays visible as
+`DEBT-N`. **The count of `PROOF-INTERIOR` rows is the health signal to watch**:
+it measures how much of what you owe your users is currently provable only from
+*inside* the system. Ratchet it downward.
+
 ## Evolving the Workflow (Convergence)
 
 **Every bug that escapes all agents reveals a missing rule.** When something
@@ -857,6 +1001,47 @@ This is what makes the workflow **converge** rather than re-litigate the same
 class of bug. The phantom-in-production and docstring-divergence forbidden
 patterns (items 12/13 above) and the Step-1.5 conformance checks were all born
 this way — each from a specific escape.
+
+**4. Name the method the new check uses, and confirm it differs from the methods
+already deployed against that class.** Independent reviewers give you
+independent *judgment*, not independent *method* — and only method independence
+catches what all your checks are structurally blind to. **Agreement among
+same-method checks is not evidence**: four surveys that classify by the same
+signal are one survey run four times, and the agreement reads as confidence
+while carrying zero information. (Escape that produced this rule: a finding was
+withheld from three reviewers to test their check; all three "confirmed" a false
+claim and a purpose-built AST tool missed it a fourth time — all four classified
+SQL by looking for a statement keyword, and the site assembled a keyword-free
+fragment. What moved the question was a reviewer searching accumulation patterns
+instead of keywords.) Prefer a check that fails *differently* over a check that
+fails the same way more thoroughly.
+
+**5. Prefer a derivation or a check over an assertion.** When the escape's root
+cause is a claim nothing can falsify — a convention, a count, a stored copy, a
+comment promising behavior — another rule telling someone to be careful is not a
+fix.
+
+> **Convert assertions into derivations, or into checks.** Don't state the
+> count — derive it from the files. Don't assert "no bypasses exist" — count
+> them and ratchet the count downward. Don't store the flag — derive it from
+> the state and delete the column, so consumers cannot read it. A convention is
+> a claim about future behaviour that nothing falsifies until it is violated; a
+> structure makes the violation either unrepresentable or loud.
+
+The same shape recurs across completely different artifacts: a stored copy of a
+derivable value that drifted twice, both times a shipped risk hole; one fact in
+four representations that drifted and hid four open bugs under a "Retired"
+heading; a convention with four independent checks, all wrong; a README census
+stale four times; a comment claiming containment the code never implemented.
+Every one is a claim that cannot be wrong-detected.
+
+Most of this methodology's hardest-won rules already *are* this move — the Step
+3.5 phantom-adapter grep, the "specific and greppable" requirement on forbidden
+patterns, `FRZ-N`'s keys, and SPEC §14. **§14 is the move applied to the one
+thing that genuinely cannot be derived**: you cannot compute what a user is owed
+from the code — it is real external information. Where derivation is impossible,
+the closest structural substitute is to have an independent party state it,
+commit it, and gate on its totality.
 
 ### The meta-rule for any "make it faster/cheaper" proposal
 
@@ -878,16 +1063,22 @@ Classify by *effect on those two lists*, not by how the change is described.
 
 ## Institutional Memory (Persistent Across Sessions)
 
-Four durable records keep a cold-start Claude from re-deriving settled ground:
+Five durable records keep a cold-start Claude from re-deriving settled ground:
 1. **The §8 decision log** — *why* every design choice is what it is (+ rejected
    alternatives). Skim it on resume; never re-derive a frozen decision.
 2. **The DEBT-N ledger** — what was deliberately deferred and when it is due.
-3. **A file-based memory** (if your environment provides one) — user
+3. **The §14 standing-obligations register** — what users are owed and must keep
+   being owed, with the front-door proof for each. Unlike every other record
+   here, this one is **not derivable from the repo** — it is the operator's
+   external knowledge, committed. Read it on resume before touching anything
+   load-bearing; it is the only artifact that tells you what a change could
+   silently break without contradicting a single line of code.
+4. **A file-based memory** (if your environment provides one) — user
    preferences, working agreements, and hard-won "do it this way" lessons, one
    fact per file, linked. Memory is background context that reflects what was
    true *when written* — if it names a file/flag/function, **verify it still
    exists** before acting on it. The repo, not memory, is the source of truth.
-4. **Per-agent memory** (Part 2 § "Dedicated Agents") — each dedicated agent's
+5. **Per-agent memory** (Part 2 § "Dedicated Agents") — each dedicated agent's
    own memory directory, holding the role-scoped lessons a specialist would
    otherwise re-derive expensively (a measured performance ceiling, an
    operational invariant that isn't in the spec, a flake class root-caused
@@ -901,6 +1092,20 @@ comparable complexity; **escapes-per-slice trending toward zero**; **zero flaky
 tests** holding (not creeping back as suppressions); the **forbidden-patterns list
 growing early then plateauing** (each escape adds one, then the class stops
 recurring); and **checkpoint audits finding less each time**.
+
+Two signals specific to the §14 register, which measure the one thing the others
+cannot — coverage of *absence*:
+
+- **`PROOF-INTERIOR` count trending down.** It measures how much of what you owe
+  your users is currently provable only from *inside* the system. This is the
+  single most informative number the process produces, because before §14
+  existed the quantity was not merely bad — it was unknown. Ratchet it.
+- **Obligations added per slice, not stuck at zero.** A slice that ships user-
+  visible behavior and adds no `OB-n` row is claiming it created no new
+  commitment. Sometimes true; rarely. A register that only ever grows by
+  confirming machine-seeded candidates has become a view of the test suite, and
+  it will agree with your tests forever — including about the thing they both
+  miss.
 
 The data source is free. The commit-message convention already encodes the slice
 and round (`Sx Rx`) and the decisions (`Dxx`), so `git log --oneline` **is** the

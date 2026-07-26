@@ -175,6 +175,31 @@ single-operator Step 1.5 check 6 ("does this setup feed an already-shipped
 formula?") never had. Single-lane projects may keep one for that reason
 alone.
 
+**Relationship to SPEC §14 (standing obligations).** These are the same machine
+pointed at two different things, and it is worth being precise about which is
+which. `FRZ-N` tracks *frozen arithmetic* — formulas, thresholds, rates,
+contract shapes — and its cost is bounded to rows added since the slice's
+`merge-base`, because its question is interim-scoped: "did anything freeze since
+my baseline?" §14 tracks *live obligations* — what users are owed and must keep
+being owed — and is inherently full-history, because its question is "does my
+new mechanism break anything ever shipped?" The keys column is what keeps the
+second affordable, exactly as it does the first.
+
+Two consequences at team scale:
+
+- **§14 is law, so the steward owns it**, like the rest of the SPEC. No new
+  serialization is needed: spec writes are already serialized through the
+  steward, and a `Dxx` is already required for any change. `FRZ-N` lives in
+  `PLAN.md` and gets merge-queue serialization instead — that difference is
+  deliberate, not an inconsistency. Frozen arithmetic is derived from work in
+  flight; obligations are external knowledge the operator supplies.
+- **`KEYLESS` bites much harder in §14 than in `FRZ-N`.** A frozen formula
+  almost always has a symbol. A liveness obligation frequently does not — "the
+  resting order still fires" names nothing greppable, which is exactly why that
+  class escapes. Expect `KEYLESS` to be the common case in §14 and the rare one
+  in `FRZ-N`, and staff the forced-judgment path accordingly. The cross-lane
+  checkpoint audit is where §14's full re-verification runs at team scale.
+
 The inner loop itself is untouched. Every slice, in every lane, still runs
 the full sequence — blind test writer, non-weakening implementer, parallel
 independent reviewers, fresh wiring audit, zero-tolerance exit, NOTEs count.

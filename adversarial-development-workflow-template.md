@@ -1,6 +1,6 @@
-# Adversarial Development Workflow (v2)
+# Adversarial Development Workflow (v3)
 
-*Current version: v2. Version history — what each template version added and the escapes that drove it — lives in the source repo's `CHANGELOG.md`.*
+*Current version: v3. Version history — what each template version added and the escapes that drove it — lives in the source repo's `CHANGELOG.md`.*
 
 ## For Claude Code: Read This First
 
@@ -11,9 +11,10 @@ When the user invokes this file (e.g., "implement issue #313, follow @adversaria
 2. **Derive and generate this project's agent roster if needed** (see Step 0.5 below). The workflow-stage agents — the Step 2 test writer, the Step 3 implementer, and every configured reviewer/auditor — must run on **this project's tech- and domain-specialized dedicated agents**, not stock `general-purpose`. If `AGENT_ASSIGNMENTS` still names stock defaults, derive the roster from PROJECT_CONTEXT (and the SPEC/design doc), propose it, generate the confirmed agents, and write them back into Section A before proceeding.
 3. **Gather task inputs** from the user's message and any linked issues/PRs/specs.
 4. Execute **Steps 0 → 0.5 → 1 → 2 → 1.5 → 3 → 3.5 → 4 + 4.5 + 4.6 (parallel) → 5 (iterate) → 5.5 → 6** in order. You may NOT skip, combine, reorder, or "streamline" any step. Note the fractional steps happen *between* the numbered steps: **0.5 runs after Step 0 (first run only — derives and generates this project's agents)**; 1.5 runs after Step 2 (validates test coverage before handing to the implementer); **3.5 runs after Step 3 — the orchestrator's own cheap mechanical gate before any reviewer spawns**; 4.5 and 4.6 run alongside Step 4 (all configured reviewers in parallel, one message); 5.5 runs after Step 5.
-5. For each step, spawn the required subagent via the **`Agent` tool** using the `subagent_type` from `AGENT_ASSIGNMENTS` in Section A, passing the prompt template from Section C with runtime values (`{PROJECT_CONTEXT}`, `{task_description}`, `{design_doc}`, `{deliverables_checklist}`, `{behavioral_tests_from_step_2}`, `{implementation_output_from_step_3}`, `{files_changed}`, `{finding_tracker}`) substituted from context. **Spawn every judgment-bearing agent on the strongest model available to you** (see AGENT_ASSIGNMENTS "Model tiering") — a downgraded reviewer or auditor is a silent hole in the chain.
+5. For each step, spawn the required subagent via the **`Agent` tool** using the `subagent_type` from `AGENT_ASSIGNMENTS` in Section A, passing the prompt template from Section C with runtime values (`{PROJECT_CONTEXT}`, `{task_description}`, `{design_doc}`, `{deliverables_checklist}`, `{behavioral_tests_from_step_2}`, `{implementation_output_from_step_3}`, `{files_changed}`, `{finding_tracker}`, `{standing_obligations}`, `{obligation_sweep_result}`) substituted from context. **Spawn every judgment-bearing agent on the strongest model available to you** (see AGENT_ASSIGNMENTS "Model tiering") — a downgraded reviewer or auditor is a silent hole in the chain.
 6. Maintain the **Finding Tracker** (`OPEN → GENUINELY_FIXED | SHAM_FIX | NOT_ADDRESSED | PARTIALLY_FIXED | REBUTTED`) across all review rounds.
-7. Only report success when the zero-tolerance exit condition is met.
+7. **Sweep the SPEC §14 standing-obligations register** at Step 1.5 (check 7), pass it verbatim to Step 5.5, and run the totality gate at Step 6. You may not author or edit §14 rows — the register is the one input to this workflow not derived from the system, and an agent that writes it has closed the loop it exists to break. Propose rows to the operator; the operator decides (OPERATOR Moment 6).
+8. Only report success when the zero-tolerance exit condition is met.
 
 **Do NOT write production code yourself.** You are the orchestrator. The implementation agent writes code. Your job is process discipline.
 
@@ -29,7 +30,7 @@ When the user invokes this file (e.g., "implement issue #313, follow @adversaria
 
 **You are the WEAKEST LINK in this chain.** Your completion bias will constantly tempt you to shortcut the process, rubber-stamp results, combine steps, or dismiss findings. Every shortcut you take is a bug that ships. The adversarial structure works BECAUSE it is inconvenient. If you find yourself thinking "this step isn't necessary for this task" — that thought is completion bias. Run the step anyway.
 
-**Your completion target:** "ALL configured reviewers reported zero issues on the SAME round AND every prior finding was verified as GENUINELY_FIXED AND the production wiring audit is clean AND CI passes." Anything short of that = not done.
+**Your completion target:** "ALL configured reviewers reported zero issues on the SAME round AND every prior finding was verified as GENUINELY_FIXED AND the production wiring audit is clean AND every standing obligation in scope is STILL_FIRES AND the totality gate passes AND CI passes." Anything short of that = not done.
 
 **The workflow is the product. Execute it exactly.**
 
@@ -83,7 +84,9 @@ gate is green at the final commit.]
 ## Production Entry Points
 [Where production execution starts — e.g. `main.py`, `cmd/<app>/main.go`,
 `ClusterService.onServiceStart()`. The composition root the wiring auditor
-traces from.]
+traces from — AND the door every SPEC §14 standing-obligation proof must
+enter through (Step 1.5 check 7). Tracing from here is static; running from
+here is the only dynamic check in this workflow. Both matter.]
 
 ## Type & Allocation Conventions
 [e.g. "primitives over boxed", "no allocation on hot paths", value-object rules,
@@ -212,6 +215,7 @@ User gives task to Orchestrator (you)
   [Step 2]  Test Writer — design doc only, writes behavioral tests
          v
   [Step 1.5] Orchestrator validates test COVERAGE + CONFORMANCE
+             + sweeps SPEC §14 standing obligations (check 7)
          v
   [Step 3]  Implementation Agent — makes tests pass, can't modify assertions
          v
@@ -222,9 +226,16 @@ User gives task to Orchestrator (you)
   [Step 5]  Iterate if ANY configured reviewer finds ANY issue (inc. SHAM_FIX)
          v
   [Step 5.5] Production Wiring Audit (fresh agent, post-review)
+             + Standing-Obligation Re-Verification (the audit, run backwards)
          v
-  [Step 6]  Run CI. If clean, report to user.
+  [Step 6]  Run CI + standing-obligation totality gate. If clean, report.
 ```
+
+No step was added for the standing-obligations mechanism and no agent was added
+to the roster — Step 1.5 and Step 6 are orchestrator-run, and Step 5.5's mirror
+section rides the spawn that already exists. The register itself (SPEC §14) is
+authored outside the loop by the operator, because it is the one input that
+cannot be derived from the system.
 
 ### The Finding Tracker
 
@@ -446,11 +457,34 @@ After Step 2 returns, BEFORE Step 3:
    contradicting setup is a Step-1.5 FAIL: correct the setup (or premise) BEFORE
    Step 3.
 
+7. **Standing-obligation sweep (absence class).** Checks 1–6 all enumerate from
+   THIS slice's design doc — so a behavior a PRIOR slice shipped is out of
+   scope by construction, and a slice can silently stop it happening without
+   contradicting anything. For every row in the SPEC's **§14 standing
+   obligations** register:
+   - Grep this slice's design doc and its Step-2 tests for the row's **keys**.
+   - A `KEYLESS` row skips the grep and takes a **forced judgment call**
+     against the slice's mechanisms — **fail closed**: if it is unclear whether
+     the slice interacts with the obligation, it is a hit. (`KEYLESS` is the
+     COMMON case here, not an edge case — a liveness obligation like "the
+     resting order still fires" often has no symbol to grep, which is exactly
+     why it escapes.)
+   - Every hit needs a test proving the obligation still holds **before Step
+     3**. If none exists, re-spawn Step 2 with the obligation text and why this
+     slice threatens it.
+   - Record the sweep result for EVERY row, hit or no-hit — Step 6's totality
+     gate verifies no row went unexamined.
+
 Checks 1–4 are **coverage** (does data flow from each source to an observable
 output); 5–6 are **conformance** (do the tests obey project invariants and their
-own premises). A test can be coverage-complete yet discipline-violating or
-premise-contradicting — both escape to a reviewer BLOCKER/finding if not caught
-here, costing a full implement → review → fix round.
+own premises); 7 is **non-regression of what was already owed**. A test can be
+coverage-complete yet discipline-violating or premise-contradicting — both
+escape to a reviewer BLOCKER/finding if not caught here, costing a full
+implement → review → fix round.
+
+Check 7 is the Step 1 Ambiguity Sweep's **axis 5 (Cadence / when-fires)** turned
+backwards: axis 5 asks when the CURRENT slice's behavior fires; check 7 asks
+whether every PRIOR slice's behavior still does.
 
 Component-level tests (cache CRUD works, decoder works) can pass without the components being **connected**. The implementer then satisfies the tests without wiring the subscription. Rule: **test the pipeline, not just the API.**
 
@@ -505,7 +539,19 @@ If any reviewer finds any issue at any severity:
 
 After all reviewers are clean, spawn a **fresh audit agent** (it must not have seen prior rounds — uncontaminated perspective) to verify the code is actually reachable from the production path. This step exists because the most common AI failure mode is code that compiles, passes unit tests, is exported from the module root, and is never called from production code.
 
-Use the Step 5.5 prompt from Section C. The audit must return **clean** before Step 6. If any component is flagged `PHANTOM_WIRED` or `STUB_ONLY`, send it back to the implementer and re-run Steps 4 / 4.5 / 4.6 / 5.5 until clean.
+The same auditor answers the **mirror** question in the same spawn: not only "is
+the new code reachable from production?" but "is every **standing obligation**
+still reachable from production?" Same freshness, same call-chain method,
+opposite direction. A behavior that silently stopped happening is a wiring audit
+run backwards.
+
+Use the Step 5.5 prompt from Section C, substituting `{standing_obligations}` (the SPEC §14 register, verbatim — never summarized) and `{obligation_sweep_result}` (the Step 1.5 check-7 record). If the project has no §14 register yet, pass empty strings; the auditor performs the wiring audit alone. The audit must return **clean** before Step 6. If any component is flagged `PHANTOM_WIRED` or `STUB_ONLY`, or any obligation is flagged `BROKEN` or `UNPROVEN`, send it back to the implementer and re-run Steps 4 / 4.5 / 4.6 / 5.5 until clean.
+
+**The auditor derives its own obligation scope — it does NOT inherit Step 1.5's
+hit list.** If Step 5.5 only re-verified what Step 1.5 flagged, the two gates
+would share one blind spot: a row whose keys were drafted too narrowly is missed
+at 1.5 and then never examined at 5.5 either. Two gates, one failure mode is one
+gate. Scope is defined in the prompt.
 
 ### Step 6: CI Gate and Report
 
@@ -514,12 +560,29 @@ Use the Step 5.5 prompt from Section C. The audit must return **clean** before S
    - **Hygiene-only iteration** (orchestrator has READ the diff and confirmed it is formatting / comments / import-ordering only) → the cheaper formatter + static-analysis + lint plus the targeted tests for that iteration's files.
    - **The FINAL commit is ALWAYS preceded by one full CI run, regardless of how the intermediate iterations were gated.** The depth-by-risk shortcut applies only to intermediate iterations, never to the gate immediately before commit.
    If anything fails, send it to the implementer. Do NOT report success with failing CI.
-2. Report to the user:
+2. **Standing-obligation totality gate (orchestrator-run).** Three mechanical
+   assertions — completeness is *measured*, never claimed:
+   - Every SPEC §14 row was swept at Step 1.5. The sweep record is complete; no
+     row went unexamined.
+   - Every row in the Step 5.5 obligation scope carries a verdict.
+   - Every §14 row's **Proof** column names a check that exists and runs.
+
+   **What this gate does NOT prove.** It proves the register was covered and
+   each entry names a real check. It CANNOT prove the check proves the thing —
+   a Proof that enters the system mid-path can stay green while production is
+   rerouted around it. That is the `PROOF-INTERIOR` case; it is caught by the
+   §14 Proof contract and by Step 5.5's trace, never by this gate. Do not
+   report a green totality gate as evidence an obligation holds. Without this
+   distinction stated, the register decays into the unfalsifiable prose it
+   replaced.
+3. Report to the user:
    - What was implemented (files changed, summary of behavior)
    - Every reviewer's final clean assessment
    - The finding tracker summary: total rounds, total findings, final status per finding
    - The verification command the user can run locally
-3. Do NOT editorialize about how "thorough" the process was. Report the facts.
+   - The standing-obligation result: rows swept, verdicts, and any
+     `PROOF-INTERIOR` rows outstanding
+4. Do NOT editorialize about how "thorough" the process was. Report the facts.
 
 ---
 
@@ -1074,6 +1137,12 @@ production startup path instantiates or calls it.
 ## Files Changed
 {files_changed}
 
+## Standing Obligations Register (SPEC §14 — verbatim)
+{standing_obligations}
+
+## Step 1.5 Standing-Obligation Sweep Result
+{obligation_sweep_result}
+
 ## What to Check
 
 For each new component, function, struct/class, or config field added:
@@ -1107,6 +1176,46 @@ For each new component, function, struct/class, or config field added:
    entirely, would any behavioral test fail? Would any observable behavior
    change? If neither: PHANTOM_WIRED.
 
+## Standing-Obligation Re-Verification (the audit, run backwards)
+
+Everything above asks "is the NEW code reachable from production?" This section
+asks the mirror: "is an OLD obligation still reachable from production?" Same
+method, opposite direction. A behavior that silently stopped happening produces
+no broken build, no failing test, and no diff to review — the only thing that
+detects it is tracing what was already owed.
+
+Your scope is the SPEC §14 standing-obligations register. Re-verify:
+  (a) every row the orchestrator flagged as a hit at Step 1.5, PLUS
+  (b) every KEYLESS row, UNCONDITIONALLY, PLUS
+  (c) every row whose keys hit against the ACTUAL DIFF above.
+
+Do NOT restrict yourself to (a). Step 1.5 grepped the design doc and the
+pre-written tests — intent. You have what was really built. A row whose keys
+were drafted too narrowly is invisible at Step 1.5, and if you inherited that
+list the two checks would fail together. Clause (b) is the one that matters
+most: KEYLESS is the common case for high-value liveness obligations, so it
+recovers the highest-risk rows no matter how well anyone drafted the keys.
+
+For each row in scope, trace it from a Production Entry Point to an observable
+output IN THE POST-CHANGE TREE, then return one verdict:
+
+  STILL_FIRES — trace complete; name the call chain (file:line per hop).
+  BROKEN      — trace severed; name the change that severed it.
+  UNPROVEN    — you could not establish the trace either way.
+
+UNPROVEN is not a soft pass. It exists so an obligation cannot be discharged by
+failing to find evidence: absence of a trace is not evidence of a trace. If you
+cannot complete the chain, say UNPROVEN and say where it went dark.
+
+Two traps specific to this section:
+  - **A passing test is not a trace.** The obligation's Proof may still be
+    green while production has been rerouted around it — that is the exact
+    shape of the defect. Trace the production path yourself; do not discharge a
+    row because its test passes.
+  - **A Proof that enters mid-system proves nothing here.** If the obligation's
+    Proof does not enter through a Production Entry Point, flag the row
+    PROOF-INTERIOR alongside its verdict.
+
 ## Output
 For each new component / function / config field:
    <name>: PRODUCTION_WIRED | PHANTOM_WIRED | STUB_ONLY
@@ -1114,7 +1223,14 @@ For each new component / function / config field:
 Include the production-entry call chain for every PRODUCTION_WIRED finding
 and the evidence for every PHANTOM_WIRED / STUB_ONLY finding.
 
+For each standing obligation in scope:
+   <OB-n>: STILL_FIRES | BROKEN | UNPROVEN  [+ PROOF-INTERIOR if applicable]
+
+Include the production-entry call chain for every STILL_FIRES verdict and the
+evidence for every BROKEN / UNPROVEN verdict.
+
 If ANY component is PHANTOM_WIRED or STUB_ONLY, the audit FAILS.
+If ANY obligation is BROKEN or UNPROVEN, the audit FAILS.
 
 The audit must pass cleanly before the orchestrator may proceed to Step 6.
 ```
@@ -1137,6 +1253,37 @@ Six agents (seven including the wiring auditor), six completion targets:
 
 The test writer never sees the implementation — can't accommodate shortcuts. The implementer can't weaken tests, only pass them. The process, domain-expert, and security reviewers check different axes (correctness/process, invariants/domain, and the adversary's exploitability view) and run independently in parallel so none anchors the others. The wiring auditor is fresh — uncontaminated by the review narrative. No single agent authors and validates the same work.
 
+### Independent seats are not independent checks
+
+Separation of duties buys you independent *judgment*. It does not buy you
+independent *method*, and only method independence catches a defect all your
+checks are structurally blind to.
+
+**Agreement among same-method checks is not evidence.** Four surveys that
+classify by the same signal are one survey run four times; the agreement reads
+as confidence while contributing zero information. This is not hypothetical —
+in the reference project a finding was withheld from three reviewers to test
+whether their check was sound. All three independently "confirmed" a claim that
+was false, and a purpose-built AST tool missed it a fourth time. All four
+classified SQL by looking for a statement keyword; the offending site assembled
+a keyword-free fragment. Four independent agents, one shared method. What
+actually moved the question was a reviewer who searched for accumulation
+patterns (`pred +=`) instead of keywords — a different method, not a fifth
+opinion.
+
+Two consequences that bind:
+
+- **When Section G folds an escape into a new check, name the method that check
+  uses and confirm it differs from the methods already deployed against that
+  class.** A rule that adds a fifth keyword grep to four failing keyword greps
+  is not convergence; it is the appearance of it.
+- **Prefer a check that fails differently over a check that fails the same way
+  more thoroughly.** The reason Step 5.5 catches what Steps 4/4.5/4.6 miss is
+  not that its agent is smarter — it is that call-chain tracing fails
+  differently from diff reading. The reason SPEC §14 proofs must run from a
+  Production Entry Point is that execution fails differently from every
+  artifact-analysis check in this document.
+
 ---
 
 ## Section E — Anti-Patterns to Watch For
@@ -1157,6 +1304,9 @@ The test writer never sees the implementation — can't accommodate shortcuts. T
 - **Orchestrator turns a reviewer into an author:** injecting a "run the mutation then revert" / code-edit / verification instruction into a Step 4/4.5/4.6/5.5 prompt, or otherwise modifying a Section C template, so a reviewer/auditor edits the working tree. *Defense: reviewers/auditors are STRICTLY READ-ONLY (Section C READ-ONLY MANDATE); they report a suspected-vacuous test as a finding with the mutation described; the **orchestrator** owns every mutation-proof. Section C templates are passed verbatim. A reviewer that edits the artifact it validates breaks the separation of duties, and parallel reviewers on one shared tree are a lost-update hazard.*
 - **Fabricated green — implementer reports passing tests the orchestrator never reproduced:** the implementer's output claims the suite is green, but the orchestrator hands that claim to reviewers without re-running it. *Defense: the Step 3.5 Cheap Mechanical Gate INDEPENDENTLY re-runs the implementer's claimed-passing tests every round; a red re-run returns to Step 3 and NO reviewer is spawned. A green you did not reproduce is not a green.*
 - **Phantom-in-production adapter:** real values materialize only through a test-only seam while the shipping binary gets a no-op / empty / zero implementation; the feature "works" in tests and is inert in production. *Defense: the forbidden pattern, the Step 3.5 phantom-adapter grep, and the Phantom-in-Production Verification block now in all three reviewer prompts shift the catch to the first review round. A simulated/stub adapter intended to ship must GENERATE values.*
+- **The absence class — a shipped behavior silently stops happening:** nothing written is wrong; something unwritten is missing. Every technique in this document compares one artifact against another derived from the same understanding — tests↔code, coverage↔lines, mutation↔code, types↔uses, wiring↔components, review↔diff — so each can only find *contradictions inside* the system. An absence is not a contradiction. Formally: the suite accretes **safety** properties ("nothing bad happens" — witnessed by a finite trace, cheap, always terminates) and drifts structurally blind to **liveness** ("something good eventually happens" — untestable unless someone names the good thing). *Canonical shape: two independently-correct slices compose badly. A replace path was right when nothing fired; a pump was right on its own; their product belonged to nobody, and a resting order silently stopped firing while conservation, ledger balance, determinism, and isolation all held.* **Defense: the SPEC §14 standing-obligations register, Step 1.5 check 7, the Step 5.5 mirror section, and the Step 6 totality gate. The register is the only input not derived from the system — which is why the operator authors it (OPERATOR Moment 6) and no agent may.**
+- **Interior proof — the check that entered where the break didn't:** an obligation's test constructs its scenario mid-system, stays green forever, and stops representing production the moment a change reroutes the path around it. The test is not weak; it is *entering in the wrong place*, and no amount of assertion strength fixes that. *Defense: the §14 Proof contract — a proof must enter through a declared Production Entry Point and assert only on user-observable output. A proof that cannot is marked `PROOF-INTERIOR` and treated as an unproven obligation, tracked as DEBT-N. **A green totality gate is compatible with a broken obligation**; only the trace and the front-door proof distinguish them.*
+- **Confidence by redundancy — layered checks that all fail the same way:** three reviewers plus a purpose-built tool agree, and all four share one method, so the agreement carries no information. *Defense: Section D "Independent seats are not independent checks." Vary the mechanism, not just the reviewer; name the method when folding in a new check.*
 - **Efficiency-as-erosion — an "optimization" that quietly removes an adversarial guarantee:** dropping a reviewer, letting the implementer self-certify, trusting a summary instead of independently verifying, or treating a NOTE as waivable, all sold as "saving a round." *Defense: the Section G meta-rule. An optimization may change WHEN a check runs, HOW MUCH surface is re-read, WHAT MODEL runs pure pattern-matching, and HOW DEEP verification goes by risk. It may NEVER change WHO validates (never an author of the same work), WHETHER the orchestrator independently verifies (always), or WHETHER NOTEs can be waived (never). If it touches the second list, it is erosion, not efficiency — reject it.*
 
 ---
@@ -1177,6 +1327,32 @@ Apply the full workflow where the cost of a production bug exceeds the cost of t
 ## Section G — Evolving the Workflow
 
 Every bug that escapes all agents reveals a gap in the prompts. Add the missing check as a new rule in whichever agent should have caught it, and add the bug to `PROJECT_CONTEXT`'s forbidden patterns. The rules added after each escape are what make the workflow converge. When you fold an escape in, leave a short "escape folded into vN" note so the *why* of each rule survives.
+
+**Name the method.** State which method the new check uses and confirm it
+differs from the methods already deployed against that class (Section D,
+"Independent seats are not independent checks"). A fifth check that fails the
+same way as the four that missed it adds cost and the appearance of rigor, and
+nothing else.
+
+**Prefer a derivation or a check over an assertion.** When the escape's root
+cause is a *claim nothing can falsify* — a convention, a count, a stored copy, a
+comment promising behavior — the durable fix is structural, not another rule
+telling someone to be careful:
+
+> **Convert assertions into derivations, or into checks.** Don't state the
+> count — derive it from the files. Don't assert "no bypasses exist" — count
+> them and ratchet the count downward. Don't store the flag — derive it from
+> the state and delete the column, so consumers cannot read it. A convention is
+> a claim about future behaviour that nothing falsifies until it is violated; a
+> structure makes the violation either unrepresentable or loud.
+
+Most of this document's hardest-won rules are that move already: the Step 3.5
+phantom-adapter grep, the "specific and greppable" requirement on forbidden
+patterns, `FRZ-N`'s greppable keys, and SPEC §14 itself. §14 is the move applied
+to the one thing that genuinely cannot be derived — you cannot compute what a
+user is owed from the code — so where derivation is impossible, the closest
+structural substitute is: have an independent party state it, commit it, and
+gate on its totality.
 
 **Fold back upstream.** If your escape is generalizable beyond your project — a class of AI failure any project using this kit could hit, not a quirk of your stack — contribute it back to the source kit (an issue or PR) so the next template version carries the rule. The kit converges the same way your local copy does: from the escapes its users fold in. The reference project's phantom-in-production catch became Forbidden Patterns 12/13 and the Step 3.5 grep this way.
 
@@ -1209,6 +1385,8 @@ You are an LLM. You optimize for task completion. This workflow deliberately slo
 
 Every shortcut you take — combined step, skipped reviewer, dismissed finding, accepted sham fix — is a bug that ships to production. The fastest path through this workflow is NOT the path with the fewest steps. The fastest path is the one where every step is done right the first time, so you don't have to redo the entire workflow when the bug surfaces.
 
-**The efficiency optimizations are not permission to erode.** v2 adds real efficiencies (the Step 1 ambiguity sweep, the Step 3.5 cheap mechanical gate, delta-scoped fix-round review, model tiering, depth-by-risk CI). Every one of them changes only WHEN a check runs, HOW MUCH surface is re-read, WHAT MODEL runs a pattern-matching step, or HOW DEEP verification goes by risk. NOT ONE of them changes who validates, whether you independently verify, or whether a NOTE can be waived — and you may not either. The moment "efficiency" reaches for those three, it has become the exact completion bias this whole document exists to defeat. Optimize the cost of rigor; never optimize the rigor away.
+**The efficiency optimizations are not permission to erode.** v2 adds real efficiencies (the Step 1 ambiguity sweep, the Step 3.5 cheap mechanical gate, delta-scoped fix-round review, model tiering, depth-by-risk CI). Every one of them changes only WHEN a check runs, HOW MUCH surface is re-read, WHAT MODEL runs a pattern-matching step, or HOW DEEP verification goes by risk. NOT ONE of them changes who validates, whether you independently verify, or whether a NOTE can be waived — and you may not either.
+
+**And your blind spot is not a shortcut you took — it is a question you were never asked.** Every check in this document compares two artifacts derived from the same understanding, so all of them together still cannot see a behavior that silently stopped happening. You will not *feel* that gap; there is no failing test, no red build, no diff to review, and every gate reports green. That is the absence class (Section E), and the only defense is a register you did not author and a proof that enters through the front door. When the §14 sweep looks like paperwork on a slice that "obviously doesn't touch any of that" — that is the feeling the class is made of. Run it. The moment "efficiency" reaches for those three, it has become the exact completion bias this whole document exists to defeat. Optimize the cost of rigor; never optimize the rigor away.
 
 The workflow is the product. Execute it exactly.
